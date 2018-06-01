@@ -7,9 +7,19 @@ public class Rocket : MonoBehaviour {
     AudioSource audioSource;
     [SerializeField] float rcsThrust = 100f;
     [SerializeField] float boosterThrust = 1000f;
+    [SerializeField] float levelLoadDelay = 2f;
+
+    [SerializeField] AudioClip mainEngine;
+    [SerializeField] AudioClip deathSound;
+    [SerializeField] AudioClip completeLevel;
+
+    [SerializeField] ParticleSystem mainEngineParticles;
+    [SerializeField] ParticleSystem successParticles;
+    [SerializeField] ParticleSystem deathParticles;
 
     private enum State { Alive, Dying, Transcending };
     State state = State.Alive;
+
 
     // Use this for initialization
     void Start () {
@@ -26,6 +36,7 @@ public class Rocket : MonoBehaviour {
         }
 	}
 
+
     void OnCollisionEnter(Collision collision)
     {
         if (state != State.Alive)
@@ -39,54 +50,83 @@ public class Rocket : MonoBehaviour {
                 // do nothing
                 break;
             case "Finish":
-                state = State.Transcending;
-                Invoke("LoadNextScene", 1f);
+                StartSuccessSequence();
                 break;
             default:
-                state = State.Dying;
-                Invoke("LoadFirstScene", 1f);
+                StartDeathSequence();
                 break;
         }
     }
+
+
+    private void StartDeathSequence()
+    {
+        state = State.Dying;
+        audioSource.Stop();
+        audioSource.PlayOneShot(deathSound);
+        deathParticles.Play();
+        Invoke("LoadFirstScene", levelLoadDelay);
+    }
+
+
+    private void StartSuccessSequence()
+    {
+        state = State.Transcending;
+        audioSource.Stop();
+        audioSource.PlayOneShot(completeLevel);
+        successParticles.Play();
+        Invoke("LoadNextScene", levelLoadDelay);
+    }
+
 
     private void LoadFirstScene()
     {
         SceneManager.LoadScene(0);
     }
 
+
     private void LoadNextScene()
     {
         SceneManager.LoadScene(1);
     }
 
+
     private void ProcessInput()
     {
-        Thrust();
-        Rotate();
+        RespondToThrustInput();
+        RespondToRotateInput();
     }
 
 
-    private void Thrust()
+    private void RespondToThrustInput()
     {
         // Thrust input
         if (Input.GetKey(KeyCode.Space))
         {
-            float boosterThisFrame = boosterThrust * Time.deltaTime; 
-            rigidBody.AddRelativeForce(Vector3.up * boosterThisFrame);
-
-            if (!audioSource.isPlaying) // so it doesn't layer audio 
-            {
-                audioSource.Play();
-            }
+            ApplyThrust();
         }
         else
         {
             audioSource.Stop();
+            mainEngineParticles.Stop();
         }
     }
 
 
-    private void Rotate()
+    private void ApplyThrust()
+    {
+        float boosterThisFrame = boosterThrust * Time.deltaTime;
+        rigidBody.AddRelativeForce(Vector3.up * boosterThisFrame);
+
+        if (!audioSource.isPlaying) // so it doesn't layer audio 
+        {
+            audioSource.PlayOneShot(mainEngine);
+        }
+        mainEngineParticles.Play();
+    }
+
+
+    private void RespondToRotateInput()
     {
         rigidBody.freezeRotation = true; // take manual control of the rotation
         float rotationThisFrame = rcsThrust * Time.deltaTime;
